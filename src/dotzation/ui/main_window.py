@@ -86,6 +86,10 @@ class DotzationWindow(QMainWindow):
         self.method_description.setAlignment(Qt.AlignmentFlag.AlignTop)
         settings_layout.addRow("説明", self.method_description)
 
+        self.convert_button = QPushButton("変換")
+        self.convert_button.setEnabled(False)
+        settings_layout.addRow("", self.convert_button)
+
         main_layout.addWidget(settings_group)
 
         self._update_method_description()
@@ -107,8 +111,8 @@ class DotzationWindow(QMainWindow):
     def _connect_signals(self) -> None:
         self.load_button.clicked.connect(self._select_image)
         self.save_button.clicked.connect(self._save_image)
-        self.dot_size_spin.valueChanged.connect(self._on_parameters_changed)
         self.method_combo.currentIndexChanged.connect(self._on_method_changed)
+        self.convert_button.clicked.connect(self._on_convert_clicked)
 
     # ----------------------------------------------------------- Handlers
     def _select_image(self) -> None:
@@ -130,6 +134,7 @@ class DotzationWindow(QMainWindow):
         self._update_original_preview()
         self._update_processed_preview()
         self.save_button.setEnabled(True)
+        self.convert_button.setEnabled(True)
 
     def _save_image(self) -> None:
         if self._processed_image is None:
@@ -152,7 +157,7 @@ class DotzationWindow(QMainWindow):
         else:
             QMessageBox.information(self, "保存しました", f"画像を保存しました: {filename}")
 
-    def _on_parameters_changed(self) -> None:
+    def _on_convert_clicked(self) -> None:
         self._update_processed_preview()
 
     def _on_method_changed(self, index: int) -> None:  # noqa: ARG002 - signal signature
