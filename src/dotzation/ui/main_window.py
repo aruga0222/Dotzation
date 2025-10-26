@@ -70,6 +70,13 @@ class DotzationWindow(QMainWindow):
         settings_group = QGroupBox("ハーフトーン設定")
         settings_layout = QFormLayout(settings_group)
 
+        self.zoom_spin = QSpinBox()
+        self.zoom_spin.setRange(50, 300)
+        self.zoom_spin.setValue(100)
+        self.zoom_spin.setSuffix(" %")
+        self.zoom_spin.setSingleStep(10)
+        settings_layout.addRow("Zoom", self.zoom_spin)
+
         self.dot_size_spin = QSpinBox()
         self.dot_size_spin.setRange(2, 64)
         self.dot_size_spin.setValue(12)
@@ -88,7 +95,16 @@ class DotzationWindow(QMainWindow):
 
         self.convert_button = QPushButton("変換")
         self.convert_button.setEnabled(False)
-        settings_layout.addRow("", self.convert_button)
+        self.merge_button = QPushButton("マージ")
+        self.merge_button.setEnabled(False)
+
+        buttons_widget = QWidget()
+        buttons_layout = QHBoxLayout(buttons_widget)
+        buttons_layout.setContentsMargins(0, 0, 0, 0)
+        buttons_layout.addWidget(self.convert_button)
+        buttons_layout.addWidget(self.merge_button)
+        buttons_layout.addStretch(1)
+        settings_layout.addRow("", buttons_widget)
 
         main_layout.addWidget(settings_group)
 
@@ -113,6 +129,8 @@ class DotzationWindow(QMainWindow):
         self.save_button.clicked.connect(self._save_image)
         self.method_combo.currentIndexChanged.connect(self._on_method_changed)
         self.convert_button.clicked.connect(self._on_convert_clicked)
+        self.merge_button.clicked.connect(self._on_merge_clicked)
+        self.zoom_spin.valueChanged.connect(self._on_zoom_changed)
 
     # ----------------------------------------------------------- Handlers
     def _select_image(self) -> None:
@@ -160,25 +178,55 @@ class DotzationWindow(QMainWindow):
     def _on_convert_clicked(self) -> None:
         self._update_processed_preview()
 
+    def _on_merge_clicked(self) -> None:
+        if self._original_image is None or self._processed_image is None:
+            self._show_error("マージできません", "元画像または変換結果がありません。")
+            return
+
+        try:
+            merged = halftone.merge_with_original(self._original_image, self._processed_image)
+        except Exception as exc:  # pragma: no cover - GUI feedback
+            self._show_error("マージに失敗しました", str(exc))
+            return
+
+        self._processed_image = merged
+        target_size = self._target_preview_size()
+        pixmap = halftone.scaled_pixmap(
+            merged,
+            target_size.width(),
+            target_size.height(),
+        )
+        self.processed_preview.image_label.setText("")
+        self.processed_preview.image_label.setPixmap(pixmap)
+
     def _on_method_changed(self, index: int) -> None:  # noqa: ARG002 - signal signature
         self._update_method_description()
         self._update_processed_preview()
 
+    def _on_zoom_changed(self, value: int) -> None:  # noqa: ARG002
+        if self._original_image is not None:
+            self._update_original_preview()
+        if self._processed_image is not None:
+            self._update_processed_preview()
+
     # -------------------------------------------------------------- Helpers
     def _update_original_preview(self) -> None:
         assert self._original_image is not None
+        target_size = self._target_preview_size()
         pixmap = halftone.scaled_pixmap(
             self._original_image,
-            self.PREVIEW_SIZE.width(),
-            self.PREVIEW_SIZE.height(),
+            target_size.width(),
+            target_size.height(),
         )
         self.original_preview.image_label.setText("")
+        self.original_preview.image_label.setMinimumSize(target_size)
         self.original_preview.image_label.setPixmap(pixmap)
 
     def _update_processed_preview(self) -> None:
         if self._original_image is None:
             return
 
+        target_size = self._target_preview_size()
         try:
             self._processed_image = halftone.process_image(
                 self._original_image,
@@ -191,11 +239,13 @@ class DotzationWindow(QMainWindow):
 
         pixmap = halftone.scaled_pixmap(
             self._processed_image,
-            self.PREVIEW_SIZE.width(),
-            self.PREVIEW_SIZE.height(),
+            target_size.width(),
+            target_size.height(),
         )
         self.processed_preview.image_label.setText("")
+        self.processed_preview.image_label.setMinimumSize(target_size)
         self.processed_preview.image_label.setPixmap(pixmap)
+        self.merge_button.setEnabled(True)
 
     def _update_method_description(self) -> None:
         method_name = self.method_combo.currentText()
@@ -206,3 +256,9 @@ class DotzationWindow(QMainWindow):
 
     def _show_error(self, title: str, message: str) -> None:
         QMessageBox.critical(self, title, message)
+
+    def _target_preview_size(self) -> QSize:
+        scale = max(self.zoom_spin.value(), 1) / 100.0
+        width = max(1, int(self.PREVIEW_SIZE.width() * scale))
+        height = max(1, int(self.PREVIEW_SIZE.height() * scale))
+        return QSize(width, height)

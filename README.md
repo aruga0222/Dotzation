@@ -49,3 +49,15 @@ python -m dotzation
 ## ライセンス
 
 このリポジトリは公開ライセンスが明記されていません。利用する場合は必要に応じて作成者に確認してください。
+
+## ASCII Halftone
+
+Select the "ASCII Halftone" method in the UI to preview a square, terminal-style halftone. Smaller dot sizes produce finer detail.
+To print the ASCII art in your terminal, run:
+
+```bash
+python -m dotzation.ascii_cli input.jpg --dot-size 8
+```
+
+You can set --charset to control which characters are used (for example " .:-=+*#%@").
+If the proportions look stretched in your terminal, adjust --char-aspect to match your font's height/width ratio.
